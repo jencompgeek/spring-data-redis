@@ -29,10 +29,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.Future;
 
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.data.redis.connection.AbstractConnectionPipelineIntegrationTests;
 import org.springframework.data.redis.connection.DefaultStringRedisConnection;
 import org.springframework.data.redis.connection.DefaultStringTuple;
@@ -42,7 +44,11 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import com.lambdaworks.redis.KeyValue;
+import com.lambdaworks.redis.RedisAsyncConnection;
+import com.lambdaworks.redis.RedisClient;
+import com.lambdaworks.redis.RedisConnection;
 import com.lambdaworks.redis.ScoredValue;
+import com.lambdaworks.redis.protocol.Command;
 
 /**
  * Integration test of {@link LettuceConnection} pipeline functionality
@@ -58,13 +64,47 @@ public class LettuceConnectionPipelineIntegrationTests extends
 	@Ignore("DATAREDIS-144 Lettuce closePipeline hangs with discarded transaction")
 	public void testMultiDiscard() {
 	}
-
-	@Ignore("DATAREDIS-122 exec never returns null")
+	
+	
+	@Test
 	public void testWatch() throws Exception {
-	}
-
-	@Ignore("DATAREDIS-122 exec never returns null")
-	public void testUnwatch() throws Exception {
+		RedisClient client = new RedisClient("localhost", 6379);
+		RedisAsyncConnection<byte[], byte[]> nativeConn = client.connectAsync(LettuceUtils.CODEC);
+		RedisAsyncConnection<byte[], byte[]> nativeConn2 = client.connectAsync(LettuceUtils.CODEC);
+		RedisConnection syncConn = new com.lambdaworks.redis.RedisConnection<byte[], byte[]>(nativeConn2);
+		
+		Future watch = nativeConn.watch("testitnow".getBytes());
+		//Future get = nativeConn.get("testitnow".getBytes());
+		syncConn.set("testitnow".getBytes(), "something".getBytes());
+		Future mul = nativeConn.multi();
+		Future set = nativeConn.set("testitnow".getBytes(), "somethingelse".getBytes());
+		Future<List<Object>> f = nativeConn.exec();
+		List<Object> results = f.get();
+		System.out.println(results);
+		Command[] ppline = new Command[] {(Command)watch, (Command)mul, (Command)set};
+		nativeConn.awaitAll(ppline);
+		for (Command<?, ?, ?> cmd : ppline) {
+			if (cmd.getOutput().hasError()) {
+				throw new RuntimeException(cmd.getOutput().getError());
+			}else {
+				System.out.println(cmd.getOutput().get());
+			}
+		}
+//		DefaultStringRedisConnection conn3 = new DefaultStringRedisConnection(
+//				connectionFactory.getConnection());
+//		conn3.set("testitnow", "willdo");
+//		conn3.close();
+//		connection.watch("testitnow".getBytes());
+//		connection.get("testitnow");
+//		DefaultStringRedisConnection conn2 = new DefaultStringRedisConnection(
+//				connectionFactory.getConnection());
+//		conn2.set("testitnow", "something");
+//		conn2.close();
+//		connection.multi();
+//		connection.set("testitnow", "somethingelse");
+//		actual.add(connection.exec());
+//		actual.add(connection.get("testitnow"));
+//		verifyResults(Arrays.asList(new Object[] { null, "something" }), actual);
 	}
 
 	// Overrides, usually due to return values being Long vs Boolean or Set vs

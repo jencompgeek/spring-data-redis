@@ -83,6 +83,7 @@ public class LettuceConnection implements RedisConnection {
 	private boolean isMulti = false;
 	private boolean isPipelined = false;
 	private boolean closeNativeConnection = true;
+	private boolean isWatching = false;
 	private List<Command<?, ?, ?>> ppline;
 	private RedisClient client;
 	private volatile LettuceSubscription subscription;
@@ -205,6 +206,10 @@ public class LettuceConnection implements RedisConnection {
 
 	public boolean isQueueing() {
 		return isMulti;
+	}
+	
+	public boolean isWatching() {
+		return isWatching;
 	}
 
 	public boolean isPipelined() {
@@ -487,6 +492,7 @@ public class LettuceConnection implements RedisConnection {
 
 	public void discard() {
 		isMulti = false;
+		isWatching = false;
 		try {
 			if (isPipelined()) {
 				pipeline(asyncTxConn.discard());
@@ -501,12 +507,17 @@ public class LettuceConnection implements RedisConnection {
 
 	public List<Object> exec() {
 		isMulti = false;
+		isWatching = false;
 		try {
 			if (isPipelined()) {
-				 asyncTxConn.exec();
-				 return null;
+				asyncTxConn.exec().get();
+				return null;
 			}
-			return txConn.exec();
+			List<Object> results = txConn.exec();
+			if(results.isEmpty()) {
+				return null;
+			}
+			return results;
 		} catch (Exception ex) {
 			throw convertLettuceAccessException(ex);
 		}
@@ -572,17 +583,11 @@ public class LettuceConnection implements RedisConnection {
 		}
 		isMulti = true;
 		try {
-			if(asyncTxConn == null) {
-				asyncTxConn = client.connectAsync(LettuceUtils.CODEC);
-			}
-			if(txConn == null) {
-				txConn = new com.lambdaworks.redis.RedisConnection<byte[], byte[]>(asyncTxConn);
-			}
 			if (isPipelined()) {
-				pipeline(asyncTxConn.multi());
+				pipeline(getAsyncConnection().multi());
 				return;
 			}
-			txConn.multi();
+			getConnection().multi();
 		} catch (Exception ex) {
 			throw convertLettuceAccessException(ex);
 		}
@@ -694,11 +699,14 @@ public class LettuceConnection implements RedisConnection {
 			getConnection().unwatch();
 		} catch (Exception ex) {
 			throw convertLettuceAccessException(ex);
+		} finally {
+			isWatching = false;
 		}
 	}
 
 
 	public void watch(byte[]... keys) {
+		isWatching = true;
 		try {
 			if (isPipelined()) {
 				pipeline(getAsyncConnection().watch(keys));
@@ -1921,14 +1929,21 @@ public class LettuceConnection implements RedisConnection {
 	}
 
 	private RedisAsyncConnection<byte[], byte[]> getAsyncConnection() {
-		if(isQueueing()) {
+		if(isQueueing() || isWatching()) {
+			if(asyncTxConn == null) {
+				asyncTxConn = client.connectAsync(LettuceUtils.CODEC);
+			}
 			return asyncTxConn;
 		}
 		return asyncConn;
 	}
 
 	private com.lambdaworks.redis.RedisConnection<byte[], byte[]> getConnection() {
-		if(isQueueing()) {
+		if(isQueueing() || isWatching()) {
+			if(txConn == null) {
+				txConn = new com.lambdaworks.redis.RedisConnection<byte[], byte[]>(
+						getAsyncConnection());
+			}
 			return txConn;
 		}
 		return con;

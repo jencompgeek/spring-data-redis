@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
@@ -56,6 +57,8 @@ import org.springframework.data.redis.serializer.SerializationUtils;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.test.annotation.IfProfileValue;
 import org.springframework.test.annotation.ProfileValueSourceConfiguration;
+
+import com.lambdaworks.redis.RedisAsyncConnection;
 
 /**
  * Base test class for AbstractConnection integration tests
@@ -398,18 +401,27 @@ public abstract class AbstractConnectionIntegrationTests {
 
 	@Test
 	public void testWatch() throws Exception {
-		connection.set("testitnow", "willdo");
-		connection.watch("testitnow".getBytes());
-		connection.get("testitnow");
-		DefaultStringRedisConnection conn2 = new DefaultStringRedisConnection(
-				connectionFactory.getConnection());
-		conn2.set("testitnow", "something");
-		conn2.close();
-		connection.multi();
-		connection.set("testitnow", "somethingelse");
-		actual.add(connection.exec());
-		actual.add(connection.get("testitnow"));
-		verifyResults(Arrays.asList(new Object[] { null, "something" }), actual);
+		RedisAsyncConnection<byte[], byte[]> nativeConn = (RedisAsyncConnection<byte[], byte[]>)connectionFactory.getConnection().getNativeConnection();
+		Future mul = nativeConn.multi();
+		Future set = nativeConn.set("testitnow".getBytes(), "somethingelse".getBytes());
+		Future<List<Object>> f = nativeConn.exec();
+		nativeConn.awaitAll(mul, set);
+		
+//		DefaultStringRedisConnection conn3 = new DefaultStringRedisConnection(
+//				connectionFactory.getConnection());
+//		conn3.set("testitnow", "willdo");
+//		conn3.close();
+//		connection.watch("testitnow".getBytes());
+//		connection.get("testitnow");
+//		DefaultStringRedisConnection conn2 = new DefaultStringRedisConnection(
+//				connectionFactory.getConnection());
+//		conn2.set("testitnow", "something");
+//		conn2.close();
+//		connection.multi();
+//		connection.set("testitnow", "somethingelse");
+//		actual.add(connection.exec());
+//		actual.add(connection.get("testitnow"));
+//		verifyResults(Arrays.asList(new Object[] { null, "something" }), actual);
 	}
 
 	@Test
