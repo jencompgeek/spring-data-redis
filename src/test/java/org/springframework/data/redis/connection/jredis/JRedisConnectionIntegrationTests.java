@@ -66,22 +66,6 @@ public class JRedisConnectionIntegrationTests extends AbstractConnectionIntegrat
 		connection = null;
 	}
 
-	@Ignore("nulls are encoded to empty strings")
-	public void testNullKey() throws Exception {
-	}
-
-	@Ignore("nulls are encoded to empty strings")
-	public void testNullValue() throws Exception {
-	}
-
-	@Ignore("nulls are encoded to empty strings")
-	public void testHashNullKey() throws Exception {
-	}
-
-	@Ignore("nulls are encoded to empty strings")
-	public void testHashNullValue() throws Exception {
-	}
-
 	@Ignore("Pub/Sub not supported")
 	public void testPubSubWithPatterns() {
 	}
@@ -92,15 +76,6 @@ public class JRedisConnectionIntegrationTests extends AbstractConnectionIntegrat
 
 	@Ignore("DATAREDIS-129 Key search does not work with regex")
 	public void testKeys() throws Exception {
-	}
-
-	@Ignore("DATAREDIS-171 JRedis StringIndexOutOfBoundsException in info() method in Redis 2.6")
-	public void testInfo() throws Exception {
-	}
-
-	@Test(expected = UnsupportedOperationException.class)
-	public void testBitSet() throws Exception {
-		super.testBitSet();
 	}
 
 	@Test(expected = UnsupportedOperationException.class)
@@ -368,7 +343,7 @@ public class JRedisConnectionIntegrationTests extends AbstractConnectionIntegrat
 	@Test
 	public void testExecute() {
 		connection.set("foo", "bar");
-		BulkResponse response = (BulkResponse) connection.execute("GET", JredisUtils.decode("foo".getBytes()));
+		BulkResponse response = (BulkResponse) connection.execute("GET", "foo".getBytes());
 		assertEquals("bar", stringSerializer.deserialize(response.getBulkData()));
 	}
 

@@ -17,10 +17,9 @@ package org.springframework.data.redis.connection.jredis;
 
 import org.jredis.ClientRuntimeException;
 import org.jredis.connector.Connection;
-import org.jredis.connector.ConnectionSpec;
 import org.jredis.connector.Connection.Socket.Property;
+import org.jredis.connector.ConnectionSpec;
 import org.jredis.ri.alphazero.JRedisClient;
-import org.jredis.ri.alphazero.JRedisService;
 import org.jredis.ri.alphazero.connection.DefaultConnectionSpec;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
@@ -47,7 +46,8 @@ public class JredisConnectionFactory implements InitializingBean, DisposableBean
 	private boolean usePool = true;
 	private int dbIndex = DEFAULT_REDIS_DB;
 
-	private JRedisService pool = null;
+	// Retired Use a connection  pool of JRedisClients instead.
+	//private JRedisService pool = null;
 	// taken from JRedis code
 	private int poolSize = 5;
 
@@ -88,25 +88,25 @@ public class JredisConnectionFactory implements InitializingBean, DisposableBean
 			}
 		}
 
-		if (usePool) {
-			int size = getPoolSize();
-			pool = new JRedisService(connectionSpec, size);
-		}
+		//if (usePool) {
+			//int size = getPoolSize();
+			//pool = new JRedisService(connectionSpec, size);
+		//}
 	}
 
 
 	
 	public void destroy() {
-		if (usePool && pool != null) {
-			pool.quit();
-			pool = null;
-		}
+		//if (usePool && pool != null) {
+			//pool.quit();
+			//pool = null;
+		//}
 	}
 
 
 	
 	public RedisConnection getConnection() {
-		return postProcessConnection(new JredisConnection((usePool ? pool : new JRedisClient(connectionSpec))));
+		return postProcessConnection(new JredisConnection((new JRedisClient(connectionSpec))));
 	}
 
 
